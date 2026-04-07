@@ -1,0 +1,32 @@
+# Nginx Reverse Proxy Tuning for Local LLMs
+
+When running Large Language Models (LLMs) and RAG (Retrieval-Augmented Generation) pipelines locally—especially on CPU-only or constrained architectures—standard reverse proxy configurations will fail. 
+
+Here are the necessary tuning parameters to apply in your **Nginx Proxy Manager (Advanced Tab)** to ensure stable AI streaming.
+
+## 1. Fixing 504 Gateway Timeout (RAG Context Processing)
+**Symptom:** When uploading large PDFs, the backend takes minutes to process the embeddings. Nginx kills the connection after 60 seconds, resulting in a parsing error on the frontend.
+**Fix:** Increase the proxy timeouts to allow the backend enough time to compute.
+
+    proxy_read_timeout 600;
+    proxy_connect_timeout 600;
+    proxy_send_timeout 600;
+
+## 2. Fixing Server-Sent Events (SSE) Streaming JSON Errors
+**Symptom:** The AI responds quickly, but the frontend throws `Unexpected token 'd', "data: {"id"... is not valid JSON`. 
+**Cause:** Nginx is buffering the streamed tokens (SSE) and delivering them in chunks, breaking the JSON structure expected by Open WebUI.
+**Fix:** Disable proxy buffering and enable WebSocket support.
+
+    proxy_buffering off;
+
+*(Note: Also ensure that the WebSockets Support toggle is enabled in the NPM UI).*
+
+## Full Custom Nginx Block
+Add this to the Advanced configuration of your target host:
+
+    proxy_buffering off;
+    proxy_read_timeout 600;
+    proxy_connect_timeout 600;
+    proxy_send_timeout 600;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
